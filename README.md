@@ -1,1 +1,3 @@
-# uos.libs
+# uos.libs  
+
+link folders to eos/libraries  
