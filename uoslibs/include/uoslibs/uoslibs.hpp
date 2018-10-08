@@ -33,4 +33,8 @@ namespace uoslibs{
 
     }
 
+    namespace tools{
+        std::vector<eosio::chain::account_object> get_all_accounts();
+    }
+
 }

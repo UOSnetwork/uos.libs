@@ -172,5 +172,19 @@ namespace uoslibs {
         }
 
     }
+    namespace tools{
+        std::vector<eosio::chain::account_object> get_all_accounts(){
+            eosio::chain::controller &cc = eosio::app().get_plugin<eosio::chain_plugin>().chain();
+
+            auto *itr = cc.db().find<eosio::chain::account_object>();
+            typedef typename chainbase::get_index_type<eosio::chain::account_object>::type index_type;
+            const auto& idx = cc.db().get_index<index_type, eosio::chain::by_name>();
+            std::vector<eosio::chain::account_object> ret;
+            for(auto item : idx){
+                ret.push_back(item);
+            }
+            return ret;
+        }
+    }
 
 }
