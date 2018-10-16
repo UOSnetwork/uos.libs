@@ -14,6 +14,7 @@
 #include <eosio/chain_api_plugin/chain_api_plugin.hpp>
 #include <eosio/chain/transaction.hpp>
 #include <eosio/chain/fork_database.hpp>
+//#include <chainbase/chainbase.hpp>
 #include <fc/io/json.hpp>
 
 #include <iostream>
@@ -187,4 +188,107 @@ namespace uoslibs {
         }
     }
 
+    namespace in_progress{
+
+
+
+
+        void table_worker1(){
+            using namespace std;
+            eosio::chain::controller &cc = eosio::app().get_plugin<eosio::chain_plugin>().chain();
+
+            uint64_t code = N(calctest1111);
+            uint64_t table = N(reports);
+            uint64_t scope = code;
+            const eosio::chain::account_object *code_accnt = cc.db().find<eosio::chain::account_object, eosio::chain::by_name>(code);
+            if(code_accnt== nullptr){
+                elog("calctest1111 not found");
+                return;
+            }
+            eosio::abi_def abi;
+            eosio::abi_serializer abis;
+
+            abi = code_accnt->get_abi();
+            abis.set_abi(abi,fc::microseconds(1000));
+
+//-----
+            for(auto item : abi.tables){
+                cout<<"+++"<<endl;
+                cout<<item.name.to_string()<<endl;
+                for(auto i : item.key_names){
+                    cout<<"-"<<i<<endl;
+                }
+                for(auto i : item.key_types){
+                    cout<<"="<<i<<endl;
+                }
+                cout<<item.index_type<<endl;
+                cout<<item.type<<endl;
+            }
+
+            cout<<fc::json::to_string(abi)<<endl;
+//-------
+
+            uint64_t table_with_index = table & 0xFFFFFFFFFFFFFFF0ULL;
+            table_with_index |= (0&0x000000000000000FULL); //secondary index
+            uint64_t table_with_index2 = table & 0xFFFFFFFFFFFFFFF0ULL;
+            table_with_index2 |= (1&0x000000000000000FULL); //third index
+
+//-------
+            cout<<"||"<<eosio::name(table_with_index).to_string()<<endl;
+//-------
+
+
+
+            const auto* t_id = cc.db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(boost::make_tuple(code, scope, table));
+            const auto* index_t_id = cc.db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(boost::make_tuple(code, scope, table_with_index));
+            const auto* index_t_id2 = cc.db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(boost::make_tuple(code, scope, table_with_index2));
+
+            if(t_id!= nullptr)
+                cout<<"Table found!"<<endl;
+
+            if (index_t_id != nullptr)
+                cout<<"Index found!"<<endl;
+            if (index_t_id2 != nullptr)
+                cout<<"Index2 found!"<<endl;
+
+//            using  conv = eosio::chain_apis::keytype_converter<eosio::chain_apis::sha256,eosio::chain_apis::hex>;
+
+            if (t_id != nullptr && index_t_id2 != nullptr) {
+                const auto &secidx = cc.db().get_index<eosio::chain::index256_index, eosio::chain::by_secondary>();
+                const chainbase::generic_index<eosio::chain::index256_index>& ssidx = cc.db().get_index<eosio::chain::index256_index>();
+                auto *iii = &ssidx;
+
+
+                for(auto rrrr = secidx.begin(); rrrr!=secidx.end();++rrrr){
+                    cout<<"---"<<rrrr->primary_key<<endl;
+                }
+                cout<<"~~~~"<<index_t_id2->id._id<<endl;
+
+
+                decltype(auto) low_tid(index_t_id2->id._id);
+                decltype(auto) next_tid(index_t_id2->id._id + 1);
+                auto lower = secidx.lower_bound(boost::make_tuple(low_tid));
+                auto upper = secidx.lower_bound(boost::make_tuple(next_tid));
+
+                for (auto itr = lower; itr != upper; ++itr) {
+
+                    const auto* itr2 = cc.db().find<eosio::chain::key_value_object, eosio::chain::by_scope_primary>(boost::make_tuple(t_id->id, itr->primary_key));
+                    if (itr2 == nullptr) {
+                        cout<<"nullptr"<<endl;
+                        continue;
+                    }
+                    vector<char> data;
+                    eosio::chain_apis::read_only::copy_inline_row(*itr2,data);
+
+                    auto ret = abis.binary_to_variant(abis.get_table_type(table),data,fc::microseconds(1000));
+                    cout<<ret.get_object().find("block_num")->value().as_int64()<<endl;
+                    cout<<"+++"<<endl;
+                    cout<<fc::json::to_string(ret)<<endl;
+                }
+
+            }
+        }
+    }
+
 }
+
