@@ -79,7 +79,7 @@ namespace uoslibs{
         inline std::string
         to_string_hex(eosio::chain::key256_t __val){
             ilog("to str hex key256_t");
-            return to_string_hex(__val[1])+to_string_hex(__val[0]);
+            return to_string_hex(__val[0])+to_string_hex(__val[1]);
         }
 
         inline std::string
@@ -104,13 +104,13 @@ namespace uoslibs{
             auto size = __val.size();
             if(size > 16 && size <= 32 ) {
                 std::string tmp[2];
-                tmp[0] = __val.substr(0,15);
+                tmp[0] = __val.substr(0,16);
                 tmp[1] = __val.substr(16);
-                arr[0] = _from_string_hex<uint64_t>(__val);
-                arr[1] = _from_string_hex<uint64_t>(__val);
+                arr[0] = _from_string_hex<uint64_t>(tmp[0]);
+                arr[1] = _from_string_hex<uint64_t>(tmp[1]);
                 unsigned __int128 ret = arr[0];
                 ret = ret << 64;
-                ret = ret & (unsigned __int128) arr[1];
+                ret = ret | (unsigned __int128) arr[1];
                 return ret;
             } else if (size<=16){
                 arr[1] = 0;
@@ -121,12 +121,13 @@ namespace uoslibs{
         }
         template <>
         inline eosio::chain::key256_t _from_string_hex<eosio::chain::key256_t>(std::string __val){
+            ilog("from string hex key256_t");
             auto size = __val.size();
             eosio::chain::key256_t ret;
             ret[0]=ret[1]=0;
             if( size >32 && size <= 64 ){
                 std::string tmp[2];
-                tmp[0] = __val.substr(0,31);
+                tmp[0] = __val.substr(0,32);
                 tmp[1] = __val.substr(32);
                 ret[0]= _from_string_hex<unsigned __int128>(tmp[0]);
                 ret[1]= _from_string_hex<unsigned __int128>(tmp[1]);
