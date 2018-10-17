@@ -44,7 +44,7 @@ namespace uoslibs{
     } //end tools
 
     namespace in_progress {
-
+//todo: check conversion
 //// to hex
         inline std::string
         to_string_hex(uint32_t __val){
@@ -79,7 +79,7 @@ namespace uoslibs{
         inline std::string
         to_string_hex(eosio::chain::key256_t __val){
             ilog("to str hex key256_t");
-            return to_string_hex(__val[0])+to_string_hex(__val[1]);
+            return to_string_hex(__val[1])+to_string_hex(__val[0]);
         }
 
         inline std::string
@@ -161,7 +161,7 @@ namespace uoslibs{
         class table_worker {
         private:
 
-            typedef typename eosio::chain_apis::keytype_converter<key_type,encoding> _key_conv;
+            using  _key_conv = eosio::chain_apis::keytype_converter<key_type,encoding> ;
             typedef typename eosio::chain_apis::keytype_converter<key_type,encoding>::input_type _input_type;
             typedef typename eosio::chain_apis::keytype_converter<key_type,encoding>::index_type _index_type;
             using _mindex_type = typename chainbase::generic_index<_index_type>;
@@ -207,12 +207,15 @@ namespace uoslibs{
             fc::variant operator[](std::string secondary_key){
                 fc::variant ret;
                 _input_type idx = _from_string_hex<_input_type >(secondary_key);
+                auto _key = _key_conv::function()( idx );
                 auto log = to_string_hex(idx);
                 elog(log.c_str());
-                if(_container== nullptr) return ret;
-                auto itr = _container->secidx.find(idx);
-                std::cout<<*itr<<std::endl;
-//                if(itr==_container->secidx.end()) {
+                log = to_string_hex(_key);
+                elog(log.c_str());
+             //   auto itr = _container->secidx.find(_key);
+//                *itr;
+                //std::cout<<*itr.value<<std::endl;
+//                if(itr==nullptr) {
 //                    elog("secondary key not found");
 //                }
 //                else{
