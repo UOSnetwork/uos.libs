@@ -45,6 +45,27 @@ namespace uoslibs{
 
     namespace in_progress {
 //todo: check conversion
+
+        inline std::string
+        reverse_bytes(std::string __val){
+            if(__val.length()==0)return "";
+            if(__val.length()==2)return __val;
+            if(__val.length()%2>0){
+                __val="0"+__val;
+            }
+            uint64_t steps = __val.length()/2;
+            std::cout<<steps<<std::endl;
+            std::string ret;
+            try{
+                for(auto i=0;i<steps;i++){
+                    ret.push_back(__val[(steps-i-1)*2]);
+                    ret.push_back(__val[(steps-i-1)*2+1]);
+                }
+            }catch (...){
+                std::cout<<"error in reverse"<<std::endl;
+            }
+            return ret;
+        }
 //// to hex
         inline std::string
         to_string_hex(uint32_t __val){
@@ -54,6 +75,7 @@ namespace uoslibs{
         inline std::string
         to_string_hex(uint64_t __val){
             ilog("to str hex uint64_t");
+            std::cout<<std::hex<<__val<<std::endl;
             return __gnu_cxx::__to_xstring<std::string>(&std::vsnprintf,4 * sizeof(uint64_t),"%016llX", __val);
         }
         inline std::string
@@ -67,6 +89,7 @@ namespace uoslibs{
             ilog("to str hex bm128");
             std::stringstream ss;
             ss<<std::setfill('0')<<std::setw(32)<<std::hex<<std::uppercase<<__val;
+
             return ss.str();
         }
         inline std::string
@@ -79,7 +102,9 @@ namespace uoslibs{
         inline std::string
         to_string_hex(eosio::chain::key256_t __val){
             ilog("to str hex key256_t");
-            return to_string_hex(__val[0])+to_string_hex(__val[1]);
+            return fc::to_hex((char*) __val._M_elems, sizeof(__val._M_elems));
+
+//            return to_string_hex(__val[0])+to_string_hex(__val[1]);
         }
 
         inline std::string
@@ -122,27 +147,32 @@ namespace uoslibs{
         template <>
         inline eosio::chain::key256_t _from_string_hex<eosio::chain::key256_t>(std::string __val){
             ilog("from string hex key256_t");
-            auto size = __val.size();
             eosio::chain::key256_t ret;
-            ret[0]=ret[1]=0;
-            if( size >32 && size <= 64 ){
-                std::string tmp[2];
-                tmp[0] = __val.substr(0,32);
-                tmp[1] = __val.substr(32);
-                ret[0]= _from_string_hex<unsigned __int128>(tmp[0]);
-                ret[1]= _from_string_hex<unsigned __int128>(tmp[1]);
-                return ret;
-            } else if (size<=32){
-                ret[1] = 0;
-                ret[0] = _from_string_hex<unsigned __int128>(__val);
-                return ret;
-            }
+//            unsigned __int128 res[2];
+            fc::from_hex(__val,(char*)ret._M_elems , sizeof(ret._M_elems) );
             return ret;
+//
+//
+//            auto size = __val.size();
+//            ret[0]=ret[1]=0;
+//            if( size >32 && size <= 64 ){
+//                std::string tmp[2];
+//                tmp[0] = __val.substr(0,32);
+//                tmp[1] = __val.substr(32);
+//                ret[0]= _from_string_hex<unsigned __int128>(tmp[0]);
+//                ret[1]= _from_string_hex<unsigned __int128>(tmp[1]);
+//                return ret;
+//            } else if (size<=32){
+//                ret[1] = 0;
+//                ret[0] = _from_string_hex<unsigned __int128>(__val);
+//                return ret;
+//            }
+//            return ret;
         }
 
         template <>
         inline fc::sha256 _from_string_hex<fc::sha256>(std::string __val) {
-            return fc::sha256(fc::string(__val));
+            return fc::sha256(__val);
         }
 
 
@@ -162,29 +192,34 @@ namespace uoslibs{
         class table_worker {
         private:
 
-            using  _key_conv = eosio::chain_apis::keytype_converter<key_type,encoding> ;
+
             typedef typename eosio::chain_apis::keytype_converter<key_type,encoding>::input_type _input_type;
             typedef typename eosio::chain_apis::keytype_converter<key_type,encoding>::index_type _index_type;
-            using _mindex_type = typename chainbase::generic_index<_index_type>;
-            typedef _mindex_type* _mindex_type_ptr;
-            typedef _index_type * _index_type_ptr;
-            using __index = decltype( ((chainbase::generic_index<_index_type>*)( nullptr ))->indices().template get<eosio::chain::by_secondary>() );
+            typedef typename eosio::chain_apis::keytype_converter<key_type,encoding> _key_conv;
+            using __index = _index_type;//decltype( (chainbase::generic_index<_index_type>)->indices());
             eosio::chain::name _code;
             eosio::chain::name _scope;
             eosio::chain::name _table;
 
+
             class container{
             public:
                 const __index &secidx;
+
+                chainbase::oid<eosio::chain::table_id_object> table_id;
+                chainbase::oid<eosio::chain::table_id_object> index_table_id;
+
                 container():
-                    secidx(eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<_index_type,eosio::chain::by_secondary>())
+                    secidx(eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<_index_type>().indices())
                 {ilog("Container created");};
                 ~container(){ilog("container deleted");}
+
             };
-            container *_container;
-            eosio::abi_def _abi;
-            eosio::abi_serializer _abis;
-            bool table_is_loaded=false;
+
+            container               *_container;
+            eosio::abi_def          _abi;
+            eosio::abi_serializer   _abis;
+            bool                    table_is_loaded =   false;
 
         public:
 
@@ -205,25 +240,41 @@ namespace uoslibs{
                 return _container->secidx.end();
             }
 
+
             fc::variant operator[](std::string secondary_key){
                 fc::variant ret;
                 _input_type idx = _from_string_hex<_input_type >(secondary_key);
                 auto _key = _key_conv::function()( idx );
-                auto log = to_string_hex(idx);
-                elog(log.c_str());
-                log = to_string_hex(_key);
-                elog(log.c_str());
-             //   auto itr = _container->secidx.find(_key);
-//                *itr;
-                //std::cout<<*itr.value<<std::endl;
-//                if(itr==nullptr) {
-//                    elog("secondary key not found");
-//                }
-//                else{
-//                    //std::cout<<itr->primary_key<<std::endl;
-//                }
+                std::cout<<secondary_key<<std::endl;
+                std::cout<<to_string_hex(idx)<<std::endl;
+                std::cout<<to_string_hex(_key)<<std::endl;
 
+                const auto &secidx_by_secondary = _container->secidx.template get<eosio::chain::by_secondary>();
 
+                auto itr = secidx_by_secondary.lower_bound(
+                        boost::make_tuple(_container->index_table_id,_key)
+                        );
+
+                elog(to_string_hex(itr->secondary_key));
+                elog(to_string_hex(_key));
+
+                if(itr->secondary_key == _key){
+                    elog("key==key");
+                    const auto & key_value_idx = eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<eosio::chain::key_value_index,eosio::chain::by_scope_primary>();
+                    auto itr2 = key_value_idx.find(boost::make_tuple(_container->table_id,itr->primary_key));
+                    if(itr2 != key_value_idx.end()) {
+                        elog("key != end");
+                        std::vector<char> data;
+                        eosio::chain_apis::read_only::copy_inline_row(*itr2,data);
+                        ret = _abis.binary_to_variant(_abis.get_table_type(_table),data,fc::microseconds(1000));
+                    }
+                    else{
+                        elog("key==end");
+                    }
+                }
+                else{
+                    elog("seckey != key");
+                }
 
                 return ret;
             }
@@ -277,35 +328,26 @@ namespace uoslibs{
                 elog("TableWorker works only with secondary indexes");
                 return;
             }
-            uint64_t uint_table = _table;
-            index_number -=2;
+            uint64_t uint_table = uint64_t (_table);
+            index_number = index_number - 2;
             uint64_t table_with_index = uint_table & 0xFFFFFFFFFFFFFFF0ULL;
             table_with_index |= (index_number & 0x000000000000000FULL);
             const auto* t_id = eosio::app().get_plugin<eosio::chain_plugin>().chain().db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(boost::make_tuple(_code, _scope, _table));
             const auto* index_t_id = eosio::app().get_plugin<eosio::chain_plugin>().chain().db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(boost::make_tuple(_code, _scope, table_with_index));
+
             if (index_t_id == nullptr){
                 table_is_loaded = false;//index in table not found
                 elog("Index is not found");
                 return;
             }
+
             _container = new container();
+            _container->table_id = t_id->id;
+            _container->index_table_id = index_t_id->id;
+
+
+
             ilog("TableWorker created");
-
-//            secidx = (eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<_index_type, eosio::chain::by_secondary>());
-//            const auto &secidx = eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<eosio::chain::index256_index, eosio::chain::by_secondary>();
-
-
-            //const auto &tidx = eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<_index_type>();
-            //secidx = &tidx;
-//            secidx = const_cast<_mindex_type>(eosio::app().get_plugin<eosio::chain_plugin>().chain().db().get_index<_index_type,eosio::chain::by_secondary>());
-//            if(secidx!=nullptr)
-//                table_is_loaded = true;
-
-
-//            decltype(auto) low_tid(index_t_id->id._id);
-//            decltype(auto) next_tid(index_t_id->id._id + 1);
-//            auto lower = secidx.lower_bound(boost::make_tuple(low_tid));
-//            auto upper = secidx.lower_bound(boost::make_tuple(next_tid));
 
         }
     }////end in progress
