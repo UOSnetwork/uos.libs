@@ -1,3 +1,5 @@
 # uos.libs  
 
-link folders to eos/libraries  
+link folders to eos/libraries
+
+**DEPRECATED**
